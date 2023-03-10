@@ -4,8 +4,10 @@ import java.time.LocalDate;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Table;
 
 @Entity
+@Table(name = "Match_Data")
 public class Match {
 
     @Id

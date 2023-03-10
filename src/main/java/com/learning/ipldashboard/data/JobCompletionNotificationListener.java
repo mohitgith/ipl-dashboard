@@ -12,6 +12,7 @@ import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.learning.ipldashboard.model.Team;
 
@@ -28,6 +29,7 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
   }
 
   @Override
+  @Transactional
   public void afterJob(JobExecution jobExecution) {
     if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
       log.info("!!! JOB FINISHED! Time to verify the results");
@@ -35,11 +37,32 @@ public class JobCompletionNotificationListener implements JobExecutionListener {
       // to store the data of individual team
       Map<String, Team> teamData = new HashMap<>();
 
-      entityManager.createQuery("select distinct m.team1, count(*) from Match m group ny m.team1", Object[].class) // Specifying the type as Object[], as the data from the query will be of both String and number
+      entityManager.createQuery("select distinct m.team1, count(*) from Match m group by m.team1", Object[].class) // Specifying the type as Object[], as the data from the query will be of both String and number
       .getResultList()
       .stream()
       .map(e -> new Team((String) e[0], (long) e[1])) // After streaming the data (Object[]), maping the value as Team instance as the Object[] is of String and number
       .forEach(team -> teamData.put(team.getTeamName(), team)); // For each entry, putting the value in the map
+
+      entityManager.createQuery("select distinct m.team2, count(*) from Match m group by m.team2", Object[].class)
+      .getResultList()
+      .stream()
+      .forEach(e -> {
+        Team team = teamData.get((String) e[0]);
+        team.setTotalMatches(team.getTotalMatches() + (long) e[1]);
+      }); // For each entry, putting the value in the map
+
+      entityManager.createQuery("select distinct m.matchWinner, count(*) from Match m group by m.matchWinner", Object[].class)
+      .getResultList()
+      .stream()
+      .forEach(e -> {
+        Team team = teamData.get((String) e[0]);
+        if (team != null) 
+          team.setTotalWins((long) e[1]);
+      }); // For each entry, putting the value in the map
+
+      teamData.values().forEach(team -> entityManager.persist(team));
+      teamData.values().forEach(team -> System.out.println(team));
+
     }
   }
 
